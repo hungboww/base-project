@@ -1,0 +1,49 @@
+version: "3.8"
+services:
+  redis:
+    image: redis:6.2.5-alpine
+    restart: always
+    volumes:
+      - ./redis-server:/data/redis
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - '6378:6378'
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+  web:
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    container_name: menekel_api
+    ports:
+      - 9191:9090
+    depends_on:
+      - mysql
+    volumes:
+      - ./:/app
+  mysql:
+    image: mysql:5.7
+    container_name: menekel_mysql
+    command: mysqld --user=root
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_DATABASE=article
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+  celery:
+    build:
+      context: .
+    container_name: celery
+    command: celery -A celery worker --loglevel=info
+    volumes:
+      - .:/code
+    env_file:
+      - ./.env
+    depends_on:
+      - mysql
+      - redis
